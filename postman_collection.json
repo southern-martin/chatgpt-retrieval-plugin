@@ -1,0 +1,141 @@
+{
+  "info": {
+    "name": "ChatGPT Retrieval Plugin",
+    "description": "Postman collection for the Retrieval Plugin API (query, upsert, upsert-file, delete).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://chatgpt-retrieval-plugin.epiphanydev.com",
+      "type": "string"
+    },
+    {
+      "key": "bearer_token",
+      "value": "<BEARER_TOKEN>",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Query",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"queries\": [\n    {\n      \"query\": \"BPAS1\",\n      \"top_k\": 5,\n      \"filter\": {\n        \"source\": \"chat\"\n      }\n    }\n  ]\n}\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/query"
+      }
+    },
+    {
+      "name": "Upsert",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"documents\": [\n    {\n      \"id\": \"example-doc-1\",\n      \"text\": \"BPAS1 launch is Jan 15 and the demo deck is in Drive.\",\n      \"metadata\": {\n        \"source\": \"chat\",\n        \"source_id\": \"bpas1-notes\",\n        \"author\": \"user\",\n        \"created_at\": \"2025-01-15T10:00:00Z\"\n      }\n    }\n  ]\n}\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/upsert"
+      }
+    },
+    {
+      "name": "Upsert File",
+      "request": {
+        "method": "POST",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            },
+            {
+              "key": "metadata",
+              "value": "{\"source\":\"file\",\"source_id\":\"example-file\",\"author\":\"user\"}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": "{{base_url}}/upsert-file"
+      }
+    },
+    {
+      "name": "Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ids\": [\"example-doc-1\"]\n}\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/delete"
+      }
+    },
+    {
+      "name": "Sub Query (Custom GPT)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"queries\": [\n    {\n      \"query\": \"BPAS1 discussions summary\",\n      \"top_k\": 5\n    }\n  ]\n}\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/sub/query"
+      }
+    }
+  ]
+}

@@ -17,6 +17,7 @@ ZILLIZ_URI = os.environ.get("ZILLIZ_URI")
 ZILLIZ_USER = os.environ.get("ZILLIZ_USER")
 ZILLIZ_PASSWORD = os.environ.get("ZILLIZ_PASSWORD")
 ZILLIZ_USE_SECURITY = False if ZILLIZ_PASSWORD is None else True
+ZILLIZ_DB_NAME = os.environ.get("ZILLIZ_DB_NAME") or "default"
 
 ZILLIZ_CONSISTENCY_LEVEL = os.environ.get("ZILLIZ_CONSISTENCY_LEVEL")
 
@@ -48,7 +49,14 @@ class ZillizDataStore(MilvusDataStore):
         except ValueError:
             # Connect to the Zilliz instance using the passed in Environment variables
             self.alias = uuid4().hex
-            connections.connect(alias=self.alias, uri=ZILLIZ_URI, user=ZILLIZ_USER, password=ZILLIZ_PASSWORD, secure=ZILLIZ_USE_SECURITY)  # type: ignore
+            connections.connect(
+                alias=self.alias,
+                uri=ZILLIZ_URI,
+                user=ZILLIZ_USER,
+                password=ZILLIZ_PASSWORD,
+                secure=ZILLIZ_USE_SECURITY,
+                db_name=ZILLIZ_DB_NAME,
+            )
             logger.info("Connect to zilliz cloud server")
 
     def _create_index(self):

@@ -179,19 +179,35 @@ class MilvusDataStore(DataStore):
         """
         try:
             self._schema_ver = "V1"
+            # Treat "can't find collection" as a simple False instead of an error (observed on Zilliz Cloud)
+            try:
+                has_collection = utility.has_collection(collection_name, using=self.alias)
+            except Exception as e:
+                if "can't find collection" in str(e):
+                    has_collection = False
+                else:
+                    raise
+
             # If the collection exists and create_new is True, drop the existing collection
-            if utility.has_collection(collection_name, using=self.alias) and create_new:
+            if has_collection and create_new:
                 utility.drop_collection(collection_name, using=self.alias)
+                has_collection = False
 
             # Check if the collection doesnt exist
-            if utility.has_collection(collection_name, using=self.alias) is False:
-                # If it doesnt exist use the field params from init to create a new schem
-                schema = [field[1] for field in SCHEMA_V2]
-                schema = CollectionSchema(schema)
-                # Use the schema to create a new collection
+            if has_collection is False:
+                # If it doesnt exist use the field params from init to create a new schema
+                schema_fields = [field[1] for field in SCHEMA_V2]
+                schema = CollectionSchema(schema_fields)
+                # Use the grpc handler directly to bypass has_collection check inside Collection() creation
+                handler = connections._fetch_handler(self.alias)
+                handler.create_collection(
+                    collection_name,
+                    schema,
+                    consistency_level=self._consistency_level,
+                )
+                # Attach Collection handle after creation
                 self.col = Collection(
                     collection_name,
-                    schema=schema,
                     using=self.alias,
                     consistency_level=self._consistency_level,
                 )
@@ -204,7 +220,7 @@ class MilvusDataStore(DataStore):
             else:
                 # If the collection exists, point to it
                 self.col = Collection(collection_name, using=self.alias)  # type: ignore
-                # Which sechma is used
+                # Which schema is used
                 for field in self.col.schema.fields:
                     if field.name == "id" and field.is_primary:
                         self._schema_ver = "V2"

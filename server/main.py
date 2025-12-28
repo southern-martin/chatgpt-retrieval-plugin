@@ -5,6 +5,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Depends, Body, UploadFil
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from models.api import (
     DeleteRequest,
@@ -82,8 +83,8 @@ async def upsert(
         ids = await datastore.upsert(request.documents)
         return UpsertResponse(ids=ids)
     except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500, detail="Internal Service Error")
+        logger.error(f"Error in upsert endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Upsert failed: {str(e)}")
 
 
 @app.post(
@@ -99,8 +100,8 @@ async def query_main(
         )
         return QueryResponse(results=results)
     except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500, detail="Internal Service Error")
+        logger.error(f"Error in query_main endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
 
 
 @sub_app.post(
@@ -118,8 +119,8 @@ async def query(
         )
         return QueryResponse(results=results)
     except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500, detail="Internal Service Error")
+        logger.error(f"Error in sub_app query endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
 
 
 @app.delete(
@@ -142,14 +143,78 @@ async def delete(
         )
         return DeleteResponse(success=success)
     except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500, detail="Internal Service Error")
+        logger.error(f"Error in delete endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
 
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint to verify datastore connectivity."""
+    try:
+        # Check if datastore is initialized
+        if 'datastore' not in globals() or datastore is None:
+            logger.warning("Health check failed: datastore not initialized")
+            raise HTTPException(
+                status_code=503,
+                detail="Datastore not initialized"
+            )
+
+        # For Milvus/Zilliz, verify the connection is alive
+        if hasattr(datastore, 'col') and hasattr(datastore.col, 'num_entities'):
+            try:
+                # Quick check that collection is accessible
+                _ = datastore.col.num_entities
+                logger.info("Health check passed: datastore is healthy")
+                return {
+                    "status": "healthy",
+                    "datastore": "connected",
+                    "message": "Service is operational"
+                }
+            except Exception as e:
+                logger.error(f"Health check failed: collection not accessible - {str(e)}")
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Datastore connection issue: {str(e)}"
+                )
+
+        # Generic health check for other datastores
+        logger.info("Health check passed: datastore initialized")
+        return {
+            "status": "healthy",
+            "datastore": "initialized",
+            "message": "Service is operational"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Health check failed with unexpected error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Health check failed: {str(e)}"
+        )
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type(Exception),
+    reraise=True
+)
+async def initialize_datastore():
+    """Initialize datastore with retry logic."""
+    logger.info("Attempting to connect to datastore...")
+    ds = await get_datastore()
+    logger.info("Successfully connected to datastore")
+    return ds
 
 @app.on_event("startup")
 async def startup():
     global datastore
-    datastore = await get_datastore()
+    try:
+        datastore = await initialize_datastore()
+    except Exception as e:
+        logger.error(f"Failed to initialize datastore after retries: {str(e)}", exc_info=True)
+        raise
 
 
 def start():
