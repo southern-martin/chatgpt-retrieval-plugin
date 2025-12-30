@@ -1,7 +1,8 @@
 import os
-from typing import Optional
+from typing import Optional, List
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Depends, Body, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
@@ -31,7 +32,23 @@ def validate_token(credentials: HTTPAuthorizationCredentials = Depends(bearer_sc
     return credentials
 
 
+def _parse_cors_origins(value: str) -> List[str]:
+    if not value:
+        return ["http://localhost:5173", "http://127.0.0.1:5173"]
+    origins = [origin.strip() for origin in value.split(",") if origin.strip()]
+    if "*" in origins:
+        return ["*"]
+    return origins or ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+
 app = FastAPI(dependencies=[Depends(validate_token)])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_parse_cors_origins(os.environ.get("CORS_ALLOW_ORIGINS", "")),
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.mount("/.well-known", StaticFiles(directory=".well-known"), name="static")
 
 # Create a sub-application, in order to access just the query endpoint in an OpenAPI schema, found at http://0.0.0.0:8000/sub/openapi.json when the app is running locally
