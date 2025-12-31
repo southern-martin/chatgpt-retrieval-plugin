@@ -9,7 +9,7 @@
     "bearer": [
       {
         "key": "token",
-        "value": "{{bearer_token}}",
+        "value": "{{BEARER_TOKEN}}",
         "type": "string"
       }
     ]
@@ -21,7 +21,7 @@
       "type": "string"
     },
     {
-      "key": "bearer_token",
+      "key": "BEARER_TOKEN",
       "value": "<BEARER_TOKEN>",
       "type": "string"
     }
