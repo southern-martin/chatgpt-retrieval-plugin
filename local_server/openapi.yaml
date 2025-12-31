@@ -122,6 +122,10 @@ components:
           title: Top K
           type: integer
           default: 3
+        offset:
+          title: Offset
+          type: integer
+          default: 0
     QueryRequest:
       title: QueryRequest
       required:

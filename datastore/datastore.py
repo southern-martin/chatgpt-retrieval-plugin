@@ -58,11 +58,27 @@ class DataStore(ABC):
         query_texts = [query.query for query in queries]
         query_embeddings = get_embeddings(query_texts)
         # hydrate the queries with embeddings
-        queries_with_embeddings = [
-            QueryWithEmbedding(**query.dict(), embedding=embedding)
-            for query, embedding in zip(queries, query_embeddings)
-        ]
-        return await self._query(queries_with_embeddings)
+        queries_with_embeddings = []
+        for query, embedding in zip(queries, query_embeddings):
+            query_dict = query.dict()
+            offset = query_dict.get("offset") or 0
+            top_k = query_dict.get("top_k") or 3
+            if offset and offset > 0:
+                query_dict["top_k"] = top_k + offset
+            queries_with_embeddings.append(
+                QueryWithEmbedding(**query_dict, embedding=embedding)
+            )
+        results = await self._query(queries_with_embeddings)
+        trimmed = []
+        for original_query, result in zip(queries, results):
+            offset = original_query.offset or 0
+            if offset > 0:
+                trimmed.append(
+                    QueryResult(query=result.query, results=result.results[offset:])
+                )
+            else:
+                trimmed.append(result)
+        return trimmed
 
     @abstractmethod
     async def _query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:
